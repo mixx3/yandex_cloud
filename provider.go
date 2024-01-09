@@ -1,4 +1,4 @@
-package hetzner
+package yandex_cloud
 
 import (
 	"context"
@@ -6,7 +6,6 @@ import (
 
 	"github.com/libdns/libdns"
 )
-
 
 type Provider struct {
 	AuthAPIToken string `json:"auth_api_token"`

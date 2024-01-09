@@ -1,4 +1,4 @@
-package hetzner
+package yandex_cloud
 
 import (
 	"bytes"
@@ -47,7 +47,7 @@ type upsertRecordsBody struct {
 	Merges       []record `json:"merges"`
 }
 
-type updateRecordsBody struct{
+type updateRecordsBody struct {
 	Deletions []record `json:"deletions"`
 	Additions []record `json:"additions"`
 }
@@ -159,13 +159,13 @@ func upsertRecord(ctx context.Context, token string, zone string, r libdns.Recor
 		TTL:  int(r.TTL.Seconds()),
 	}
 
-	if method == "DELETE"{
+	if method == "DELETE" {
 		reqData.Replacements = append(reqData.Replacements, recordData)
 	}
-	if method == "REPLACE"{
+	if method == "REPLACE" {
 		reqData.Deletions = append(reqData.Deletions, recordData)
 	}
-	if method == "MERGE"{
+	if method == "MERGE" {
 		reqData.Merges = append(reqData.Merges, recordData)
 	}
 
@@ -194,7 +194,6 @@ func upsertRecord(ctx context.Context, token string, zone string, r libdns.Recor
 	}, nil
 }
 
-
 func updateRecord(ctx context.Context, token string, zone string, r libdns.Record, method string) (libdns.Record, error) {
 	zoneID, err := getZoneID(ctx, token, zone)
 	if err != nil {
@@ -212,10 +211,10 @@ func updateRecord(ctx context.Context, token string, zone string, r libdns.Recor
 		TTL:  int(r.TTL.Seconds()),
 	}
 
-	if method == "DELETE"{
+	if method == "DELETE" {
 		reqData.Deletions = append(reqData.Deletions, recordData)
 	}
-	if method == "ADD"{
+	if method == "ADD" {
 		reqData.Additions = append(reqData.Additions, recordData)
 	}
 

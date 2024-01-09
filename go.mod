@@ -1,4 +1,4 @@
-module github.com/libdns/template
+module github.com/mixx3/yandex_cloud
 
 go 1.18
 

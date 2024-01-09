@@ -1,4 +1,4 @@
-package hetzner_test
+package yandex_cloud_test
 
 import (
 	"context"
@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/mixx3/yandex_cloud"
 	"github.com/libdns/libdns"
+	"github.com/mixx3/yandex_cloud"
 )
 
 var (
@@ -20,7 +20,7 @@ var (
 
 type testRecordsCleanup = func()
 
-func setupTestRecords(t *testing.T, p *hetzner.Provider) ([]libdns.Record, testRecordsCleanup) {
+func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, testRecordsCleanup) {
 	testRecords := []libdns.Record{
 		{
 			Type:  "TXT",
@@ -51,7 +51,7 @@ func setupTestRecords(t *testing.T, p *hetzner.Provider) ([]libdns.Record, testR
 	}
 }
 
-func cleanupRecords(t *testing.T, p *hetzner.Provider, r []libdns.Record) {
+func cleanupRecords(t *testing.T, p *yandex_cloud.Provider, r []libdns.Record) {
 	_, err := p.DeleteRecords(context.TODO(), envZone, r)
 	if err != nil {
 		t.Fatalf("cleanup failed: %v", err)
@@ -59,7 +59,7 @@ func cleanupRecords(t *testing.T, p *hetzner.Provider, r []libdns.Record) {
 }
 
 func TestMain(m *testing.M) {
-	envToken = os.Getenv("LIBDNS_HETZNER_TEST_TOKEN")
+	envToken = os.Getenv("IAM_TOKEN")
 	envZone = os.Getenv("LIBDNS_HETZNER_TEST_ZONE")
 
 	if len(envToken) == 0 || len(envZone) == 0 {
@@ -74,7 +74,7 @@ Example: "LIBDNS_HETZNER_TEST_TOKEN="123" LIBDNS_HETZNER_TEST_ZONE="my-domain.co
 }
 
 func Test_AppendRecords(t *testing.T) {
-	p := &hetzner.Provider{
+	p := &yandex_cloud.Provider{
 		AuthAPIToken: envToken,
 	}
 
@@ -158,7 +158,7 @@ func Test_AppendRecords(t *testing.T) {
 }
 
 func Test_DeleteRecords(t *testing.T) {
-	p := &hetzner.Provider{
+	p := &yandex_cloud.Provider{
 		AuthAPIToken: envToken,
 	}
 
@@ -189,7 +189,7 @@ func Test_DeleteRecords(t *testing.T) {
 }
 
 func Test_GetRecords(t *testing.T) {
-	p := &hetzner.Provider{
+	p := &yandex_cloud.Provider{
 		AuthAPIToken: envToken,
 	}
 
@@ -220,7 +220,7 @@ func Test_GetRecords(t *testing.T) {
 }
 
 func Test_SetRecords(t *testing.T) {
-	p := &hetzner.Provider{
+	p := &yandex_cloud.Provider{
 		AuthAPIToken: envToken,
 	}
 
