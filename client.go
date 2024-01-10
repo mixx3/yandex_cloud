@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -90,30 +91,22 @@ func doRequest(token string, request *http.Request) ([]byte, error) {
 	return data, nil
 }
 
-func getZoneID(ctx context.Context, token string, zone string) (string, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://dns.api.cloud.yandex.net/dns/v1/zones?name=%s", url.QueryEscape(zone)), nil)
+func getZoneName(ctx context.Context, token string, zoneID string) (string, error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", fmt.Sprintf("https://dns.api.cloud.yandex.net/dns/v1/zones/%s", zoneID), nil)
 	data, err := doRequest(token, req)
 	if err != nil {
 		return "", err
 	}
 
-	result := getAllZonesResponse{}
+	result := zone{}
 	if err := json.Unmarshal(data, &result); err != nil {
 		return "", err
 	}
 
-	if len(result.DnsZones) > 1 {
-		return "", errors.New("zone is ambiguous")
-	}
-
-	return result.DnsZones[0].ID, nil
+	return result.Name, nil
 }
 
-func getAllRecords(ctx context.Context, token string, zone string) ([]libdns.Record, error) {
-	zoneID, err := getZoneID(ctx, token, zone)
-	if err != nil {
-		return nil, err
-	}
+func getAllRecords(ctx context.Context, token string, zoneID string) ([]libdns.Record, error) {
 	url := fmt.Sprintf("https://dns.api.cloud.yandex.net/dns/v1/zones/%s:listRecordSets", zoneID)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 
@@ -141,20 +134,24 @@ func getAllRecords(ctx context.Context, token string, zone string) ([]libdns.Rec
 	return records, nil
 }
 
-func upsertRecord(ctx context.Context, token string, zone string, r libdns.Record, method string) (libdns.Record, error) {
-	zoneID, err := getZoneID(ctx, token, zone)
-	if err != nil {
-		return libdns.Record{}, err
-	}
+func upsertRecord(ctx context.Context, token string, zoneID string, r libdns.Record, method string) (libdns.Record, error) {
+	// zoneID, err := getZoneID(ctx, token, zone)
+	// if err != nil {
+	// 	return libdns.Record{}, err
+	// }
 
 	reqData := upsertRecordsBody{
 		Replacements: []record{},
 		Deletions:    []record{},
 		Merges:       []record{},
 	}
+	zoneName, err := getZoneName(ctx, token, zoneID)
+	if err != nil{
+		return libdns.Record{}, err
+	}
 	recordData := record{
 		Type: r.Type,
-		Name: normalizeRecordName(r.Name, zone),
+		Name: normalizeRecordName(r.Name, zoneName),
 		Data: []string{r.Value},
 		TTL:  int(r.TTL.Seconds()),
 	}
@@ -194,8 +191,8 @@ func upsertRecord(ctx context.Context, token string, zone string, r libdns.Recor
 	}, nil
 }
 
-func updateRecord(ctx context.Context, token string, zone string, r libdns.Record, method string) (libdns.Record, error) {
-	zoneID, err := getZoneID(ctx, token, zone)
+func updateRecord(ctx context.Context, token string, zoneID string, r libdns.Record, method string) (libdns.Record, error) {
+	zoneName, err := getZoneName(ctx, token, zoneID)
 	if err != nil {
 		return libdns.Record{}, err
 	}
@@ -206,7 +203,7 @@ func updateRecord(ctx context.Context, token string, zone string, r libdns.Recor
 	}
 	recordData := record{
 		Type: r.Type,
-		Name: normalizeRecordName(r.Name, zone),
+		Name: normalizeRecordName(r.Name, zoneName),
 		Data: []string{r.Value},
 		TTL:  int(r.TTL.Seconds()),
 	}
