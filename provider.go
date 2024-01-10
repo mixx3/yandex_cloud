@@ -37,9 +37,9 @@ func (p *Provider) AppendRecords(ctx context.Context, zone string, records []lib
 }
 
 // DeleteRecords deletes the records from the zone.
-func (p *Provider) DeleteRecords(ctx context.Context, _ string, records []libdns.Record) ([]libdns.Record, error) {
+func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
 	for _, record := range records {
-		_, err := updateRecord(ctx, p.AuthAPIToken, "", record, "DELETE")
+		_, err := updateRecord(ctx, p.AuthAPIToken, unFQDN(zone), record, "DELETE")
 		if err != nil {
 			return nil, err
 		}

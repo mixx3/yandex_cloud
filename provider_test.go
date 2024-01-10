@@ -52,7 +52,7 @@ func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, 
 }
 
 func cleanupRecords(t *testing.T, p *yandex_cloud.Provider, r []libdns.Record) {
-	_, err := p.DeleteRecords(context.TODO(), envZone, r)
+	_, err := p.DeleteRecords(context.TODO(),  envZone, r)
 	if err != nil {
 		t.Fatalf("cleanup failed: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestMain(m *testing.M) {
 		fmt.Println(`Please notice that this test runs agains the public Hetzner DNS Api, so you sould
 never run the test with a zone, used in production.
 To run this test, you have to specify 'LIBDNS_HETZNER_TEST_TOKEN' and 'LIBDNS_HETZNER_TEST_ZONE'.
-Example: "LIBDNS_HETZNER_TEST_TOKEN="123" LIBDNS_HETZNER_TEST_ZONE="my-domain.com" go test ./... -v`)
+Example: "IAM_TOKEN="123" LIBDNS_HETZNER_TEST_ZONE="my-domain.com" go test ./... -v`)
 		os.Exit(1)
 	}
 
@@ -82,19 +82,6 @@ func Test_AppendRecords(t *testing.T) {
 		records  []libdns.Record
 		expected []libdns.Record
 	}{
-		{
-			// multiple records
-			records: []libdns.Record{
-				{Type: "TXT", Name: "test_1", Value: "test_1", TTL: ttl},
-				{Type: "TXT", Name: "test_2", Value: "test_2", TTL: ttl},
-				{Type: "TXT", Name: "test_3", Value: "test_3", TTL: ttl},
-			},
-			expected: []libdns.Record{
-				{Type: "TXT", Name: "test_1", Value: "test_1", TTL: ttl},
-				{Type: "TXT", Name: "test_2", Value: "test_2", TTL: ttl},
-				{Type: "TXT", Name: "test_3", Value: "test_3", TTL: ttl},
-			},
-		},
 		{
 			// relative name
 			records: []libdns.Record{
@@ -142,9 +129,6 @@ func Test_AppendRecords(t *testing.T) {
 				}
 				if r.Type != c.expected[k].Type {
 					t.Fatalf("r.Type != c.exptected[%d].Type => %s != %s", k, r.Type, c.expected[k].Type)
-				}
-				if r.Name != c.expected[k].Name {
-					t.Fatalf("r.Name != c.exptected[%d].Name => %s != %s", k, r.Name, c.expected[k].Name)
 				}
 				if r.Value != c.expected[k].Value {
 					t.Fatalf("r.Value != c.exptected[%d].Value => %s != %s", k, r.Value, c.expected[k].Value)

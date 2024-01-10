@@ -4,12 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"net/url"
-	"os"
+	"net/http/httputil"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,7 +57,7 @@ type record struct {
 	Type string   `json:"type"`
 	Name string   `json:"name"`
 	Data []string `json:"data"`
-	TTL  int      `json:"ttl"`
+	TTL  string      `json:"ttl"`
 }
 
 type zone struct {
@@ -73,13 +72,15 @@ func doRequest(token string, request *http.Request) ([]byte, error) {
 	request.Header.Add("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	client := &http.Client{}
+	reqDump, err := httputil.DumpRequestOut(request, true)
+	
 	response, err := client.Do(request)
 	if err != nil {
 		return nil, err
 	}
-
+	resDump, err := httputil.DumpResponse(response, true)
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return nil, fmt.Errorf("%s (%d)", http.StatusText(response.StatusCode), response.StatusCode)
+		return nil, fmt.Errorf("%s\n%s", string(resDump) , string(reqDump))
 	}
 
 	defer response.Body.Close()
@@ -122,12 +123,16 @@ func getAllRecords(ctx context.Context, token string, zoneID string) ([]libdns.R
 
 	records := []libdns.Record{}
 	for _, r := range result.Records {
+		intTtl, err := strconv.Atoi(r.TTL)
+		if err != nil{
+			return []libdns.Record{}, err
+		}
 		records = append(records, libdns.Record{
 			ID:    r.ID,
 			Type:  r.Type,
 			Name:  r.Name,
 			Value: r.Data[0],
-			TTL:   time.Duration(r.TTL) * time.Second,
+			TTL:   time.Duration(intTtl) * time.Second,
 		})
 	}
 
@@ -153,7 +158,7 @@ func upsertRecord(ctx context.Context, token string, zoneID string, r libdns.Rec
 		Type: r.Type,
 		Name: normalizeRecordName(r.Name, zoneName),
 		Data: []string{r.Value},
-		TTL:  int(r.TTL.Seconds()),
+		TTL:  fmt.Sprint(r.TTL.Seconds()),
 	}
 
 	if method == "DELETE" {
@@ -187,7 +192,7 @@ func upsertRecord(ctx context.Context, token string, zoneID string, r libdns.Rec
 		Type:  r.Type,
 		Name:  r.Name,
 		Value: r.Value,
-		TTL:   time.Duration(r.TTL) * time.Second,
+		TTL:   r.TTL,
 	}, nil
 }
 
@@ -205,7 +210,7 @@ func updateRecord(ctx context.Context, token string, zoneID string, r libdns.Rec
 		Type: r.Type,
 		Name: normalizeRecordName(r.Name, zoneName),
 		Data: []string{r.Value},
-		TTL:  int(r.TTL.Seconds()),
+		TTL:  fmt.Sprint(r.TTL.Seconds()),
 	}
 
 	if method == "DELETE" {
@@ -236,7 +241,7 @@ func updateRecord(ctx context.Context, token string, zoneID string, r libdns.Rec
 		Type:  r.Type,
 		Name:  r.Name,
 		Value: r.Value,
-		TTL:   time.Duration(r.TTL) * time.Second,
+		TTL:   r.TTL,
 	}, nil
 }
 
