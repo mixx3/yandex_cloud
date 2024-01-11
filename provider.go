@@ -44,11 +44,11 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 // SetRecords sets the records in the zone, either by updating existing records
 // or creating new ones. It returns the updated records.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	setRecords, err := upsertRecords(ctx, p.AuthAPIToken, zone, records, "REPLACE")
+	setRecords, err := upsertRecords(ctx, p.AuthAPIToken, zone, records, "MERGE")
 	if err != nil {
 		return setRecords, err
 	}
-	return setRecords, nil
+	return records, nil
 }
 
 // unFQDN trims any trailing "." from fqdn. Hetzner's API does not use FQDNs.

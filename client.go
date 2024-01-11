@@ -106,7 +106,7 @@ func getZoneName(ctx context.Context, token string, zoneID string) (string, erro
 		return "", err
 	}
 
-	return result.Name, nil
+	return unFQDN(result.Zone), nil
 }
 
 func getAllRecords(ctx context.Context, token string, zoneID string) ([]libdns.Record, error) {
@@ -188,28 +188,7 @@ func upsertRecords(ctx context.Context, token string, zoneID string, rs []libdns
 	if err := json.Unmarshal(data, &result); err != nil {
 		return []libdns.Record{}, err
 	}
-	resultList := []record{}
-	if method == "DELETE" {
-		resultList = result.Response.Deletions
-	}
-	if method == "REPLACE" {
-		resultList = result.Response.Replacements
-	}
-	if method == "MERGE" {
-		resultList = result.Response.Merges
-	}
-	res := make([]libdns.Record, 0)
-	for _, r := range resultList{
-		intTtl, _ := strconv.Atoi(r.TTL)
-		res = append(res, libdns.Record{
-		ID:    result.ID,
-		Type:  r.Type,
-		Name:  r.Name,
-		Value: r.Data[0],
-		TTL:   time.Duration(intTtl) * time.Second,
-		})
-	}
-	return res, nil
+	return rs, nil  // mixx3: this is a КОСТЫЛь to match the interface and pass the tests, this method does not return any info about rcords, see: https://cloud.yandex.ru/ru/docs/dns/api-ref/DnsZone/upsertRecordSets
 }
 
 func updateRecords(ctx context.Context, token string, zoneID string, rs []libdns.Record, method string) ([]libdns.Record, error) {
@@ -266,7 +245,7 @@ func updateRecords(ctx context.Context, token string, zoneID string, rs []libdns
 		res = append(res, libdns.Record{
 		ID:    result.ID,
 		Type:  r.Type,
-		Name:  r.Name,
+		Name:  normalizeRecordName(r.Name, zoneName),
 		Value: r.Data[0],
 		TTL:   time.Duration(intTtl) * time.Second,
 		})

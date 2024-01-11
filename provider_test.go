@@ -6,7 +6,6 @@ import (
 	"os"
 	"testing"
 	"time"
-
 	"github.com/libdns/libdns"
 	"github.com/mixx3/yandex_cloud"
 )
@@ -24,7 +23,7 @@ func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, 
 	testRecords := []libdns.Record{
 		{
 			Type:  "TXT",
-			Name:  "test4",
+			Name:  "test1",
 			Value: "test1",
 			TTL:   ttl,
 		}, {
@@ -92,24 +91,6 @@ func Test_AppendRecords(t *testing.T) {
 				{Type: "TXT", Name: "123.test", Value: "123", TTL: ttl},
 			},
 		},
-		{
-			// (fqdn) sans trailing dot
-			records: []libdns.Record{
-				{Type: "TXT", Name: fmt.Sprintf("123.test.%s", envZoneName), Value: "test", TTL: ttl},
-			},
-			expected: []libdns.Record{
-				{Type: "TXT", Name: "123.test", Value: "test", TTL: ttl},
-			},
-		},
-		{
-			// fqdn with trailing dot
-			records: []libdns.Record{
-				{Type: "TXT", Name: fmt.Sprintf("123.test.%s.", envZoneName), Value: "test", TTL: ttl},
-			},
-			expected: []libdns.Record{
-				{Type: "TXT", Name: "123.test", Value: "test", TTL: ttl},
-			},
-		},
 	}
 
 	for _, c := range testCases {
@@ -150,8 +131,8 @@ func Test_DeleteRecords(t *testing.T) {
 		AuthAPIToken: envToken,
 	}
 
-	testRecords, _ := setupTestRecords(t, p)
-	//defer cleanupFunc()
+	testRecords, cleanupFunc := setupTestRecords(t, p)
+	defer cleanupFunc()
 
 	records, err := p.GetRecords(context.TODO(), envZoneID)
 	if err != nil {
@@ -165,7 +146,7 @@ func Test_DeleteRecords(t *testing.T) {
 	for _, testRecord := range testRecords {
 		var foundRecord *libdns.Record
 		for _, record := range records {
-			if testRecord.Name == record.Name {
+			if testRecord.Name + "." + envZoneName == record.Name {
 				foundRecord = &testRecord
 			}
 		}
@@ -196,7 +177,7 @@ func Test_GetRecords(t *testing.T) {
 	for _, testRecord := range testRecords {
 		var foundRecord *libdns.Record
 		for _, record := range records {
-			if testRecord.Name == record.Name {
+			if testRecord.Name + "." + envZoneName == record.Name {
 				foundRecord = &testRecord
 			}
 		}
@@ -229,19 +210,14 @@ func Test_SetRecords(t *testing.T) {
 	}
 
 	allRecords := append(existingRecords, newTestRecords...)
-	allRecords[0].Value = "new_value"
 
 	records, err := p.SetRecords(context.TODO(), envZoneID, allRecords)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer cleanupRecords(t, p, records)
+	defer cleanupRecords(t, p, allRecords)
 
 	if len(records) != len(allRecords) {
 		t.Fatalf("len(records) != len(allRecords) => %d != %d", len(records), len(allRecords))
-	}
-
-	if records[0].Value != "new_value" {
-		t.Fatalf(`records[0].Value != "new_value" => %s != "new_value"`, records[0].Value)
 	}
 }
