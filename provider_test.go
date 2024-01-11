@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"testing"
 	"time"
 
@@ -14,7 +13,8 @@ import (
 
 var (
 	envToken = ""
-	envZone  = ""
+	envZoneID  = ""
+	envZoneName = ""
 	ttl      = time.Duration(120 * time.Second)
 )
 
@@ -24,7 +24,7 @@ func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, 
 	testRecords := []libdns.Record{
 		{
 			Type:  "TXT",
-			Name:  "test1",
+			Name:  "test4",
 			Value: "test1",
 			TTL:   ttl,
 		}, {
@@ -40,7 +40,7 @@ func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, 
 		},
 	}
 
-	records, err := p.AppendRecords(context.TODO(), envZone, testRecords)
+	records, err := p.AppendRecords(context.TODO(), envZoneID, testRecords)
 	if err != nil {
 		t.Fatal(err)
 		return nil, func() {}
@@ -52,7 +52,7 @@ func setupTestRecords(t *testing.T, p *yandex_cloud.Provider) ([]libdns.Record, 
 }
 
 func cleanupRecords(t *testing.T, p *yandex_cloud.Provider, r []libdns.Record) {
-	_, err := p.DeleteRecords(context.TODO(),  envZone, r)
+	_, err := p.DeleteRecords(context.TODO(),  envZoneID, r)
 	if err != nil {
 		t.Fatalf("cleanup failed: %v", err)
 	}
@@ -60,9 +60,10 @@ func cleanupRecords(t *testing.T, p *yandex_cloud.Provider, r []libdns.Record) {
 
 func TestMain(m *testing.M) {
 	envToken = os.Getenv("IAM_TOKEN")
-	envZone = os.Getenv("LIBDNS_HETZNER_TEST_ZONE")
+	envZoneName = os.Getenv("ZONE_NAME")
+	envZoneID = os.Getenv("ZONE_ID")
 
-	if len(envToken) == 0 || len(envZone) == 0 {
+	if len(envToken) == 0 || len(envZoneName) == 0 || len(envZoneID) == 0 {
 		fmt.Println(`Please notice that this test runs agains the public Hetzner DNS Api, so you sould
 never run the test with a zone, used in production.
 To run this test, you have to specify 'LIBDNS_HETZNER_TEST_TOKEN' and 'LIBDNS_HETZNER_TEST_ZONE'.
@@ -94,7 +95,7 @@ func Test_AppendRecords(t *testing.T) {
 		{
 			// (fqdn) sans trailing dot
 			records: []libdns.Record{
-				{Type: "TXT", Name: fmt.Sprintf("123.test.%s", strings.TrimSuffix(envZone, ".")), Value: "test", TTL: ttl},
+				{Type: "TXT", Name: fmt.Sprintf("123.test.%s", envZoneName), Value: "test", TTL: ttl},
 			},
 			expected: []libdns.Record{
 				{Type: "TXT", Name: "123.test", Value: "test", TTL: ttl},
@@ -103,7 +104,7 @@ func Test_AppendRecords(t *testing.T) {
 		{
 			// fqdn with trailing dot
 			records: []libdns.Record{
-				{Type: "TXT", Name: fmt.Sprintf("123.test.%s.", strings.TrimSuffix(envZone, ".")), Value: "test", TTL: ttl},
+				{Type: "TXT", Name: fmt.Sprintf("123.test.%s.", envZoneName), Value: "test", TTL: ttl},
 			},
 			expected: []libdns.Record{
 				{Type: "TXT", Name: "123.test", Value: "test", TTL: ttl},
@@ -113,7 +114,7 @@ func Test_AppendRecords(t *testing.T) {
 
 	for _, c := range testCases {
 		func() {
-			result, err := p.AppendRecords(context.TODO(), envZone+".", c.records)
+			result, err := p.AppendRecords(context.TODO(), envZoneID, c.records)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -129,6 +130,9 @@ func Test_AppendRecords(t *testing.T) {
 				}
 				if r.Type != c.expected[k].Type {
 					t.Fatalf("r.Type != c.exptected[%d].Type => %s != %s", k, r.Type, c.expected[k].Type)
+				}
+				if r.Name != c.expected[k].Name {
+					t.Fatalf("r.Name != c.exptected[%d].Name => %s != %s", k, r.Name, c.expected[k].Name)
 				}
 				if r.Value != c.expected[k].Value {
 					t.Fatalf("r.Value != c.exptected[%d].Value => %s != %s", k, r.Value, c.expected[k].Value)
@@ -146,10 +150,10 @@ func Test_DeleteRecords(t *testing.T) {
 		AuthAPIToken: envToken,
 	}
 
-	testRecords, cleanupFunc := setupTestRecords(t, p)
-	defer cleanupFunc()
+	testRecords, _ := setupTestRecords(t, p)
+	//defer cleanupFunc()
 
-	records, err := p.GetRecords(context.TODO(), envZone)
+	records, err := p.GetRecords(context.TODO(), envZoneID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -161,13 +165,13 @@ func Test_DeleteRecords(t *testing.T) {
 	for _, testRecord := range testRecords {
 		var foundRecord *libdns.Record
 		for _, record := range records {
-			if testRecord.ID == record.ID {
+			if testRecord.Name == record.Name {
 				foundRecord = &testRecord
 			}
 		}
 
 		if foundRecord == nil {
-			t.Fatalf("Record not found => %s", testRecord.ID)
+			t.Fatalf("Record not found => %s", testRecord.Name)
 		}
 	}
 }
@@ -180,7 +184,7 @@ func Test_GetRecords(t *testing.T) {
 	testRecords, cleanupFunc := setupTestRecords(t, p)
 	defer cleanupFunc()
 
-	records, err := p.GetRecords(context.TODO(), envZone)
+	records, err := p.GetRecords(context.TODO(), envZoneID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -192,13 +196,13 @@ func Test_GetRecords(t *testing.T) {
 	for _, testRecord := range testRecords {
 		var foundRecord *libdns.Record
 		for _, record := range records {
-			if testRecord.ID == record.ID {
+			if testRecord.Name == record.Name {
 				foundRecord = &testRecord
 			}
 		}
 
 		if foundRecord == nil {
-			t.Fatalf("Record not found => %s", testRecord.ID)
+			t.Fatalf("Record not found => %s", testRecord.Name)
 		}
 	}
 }
@@ -227,7 +231,7 @@ func Test_SetRecords(t *testing.T) {
 	allRecords := append(existingRecords, newTestRecords...)
 	allRecords[0].Value = "new_value"
 
-	records, err := p.SetRecords(context.TODO(), envZone, allRecords)
+	records, err := p.SetRecords(context.TODO(), envZoneID, allRecords)
 	if err != nil {
 		t.Fatal(err)
 	}

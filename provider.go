@@ -13,7 +13,7 @@ type Provider struct {
 
 // GetRecords lists all the records in the zone.
 func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record, error) {
-	records, err := getAllRecords(ctx, p.AuthAPIToken, unFQDN(zone))
+	records, err := getAllRecords(ctx, p.AuthAPIToken, zone)
 	if err != nil {
 		return nil, err
 	}
@@ -23,26 +23,19 @@ func (p *Provider) GetRecords(ctx context.Context, zone string) ([]libdns.Record
 
 // AppendRecords adds records to the zone. It returns the records that were added.
 func (p *Provider) AppendRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	var appendedRecords []libdns.Record
-
-	for _, record := range records {
-		newRecord, err := updateRecord(ctx, p.AuthAPIToken, unFQDN(zone), record, "ADD")
-		if err != nil {
-			return nil, err
-		}
-		appendedRecords = append(appendedRecords, newRecord)
+	newRecords, err := updateRecords(ctx, p.AuthAPIToken, zone, records, "ADD")
+	if err != nil {
+		return nil, err
 	}
 
-	return appendedRecords, nil
+	return newRecords, nil
 }
 
 // DeleteRecords deletes the records from the zone.
 func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	for _, record := range records {
-		_, err := updateRecord(ctx, p.AuthAPIToken, unFQDN(zone), record, "DELETE")
-		if err != nil {
-			return nil, err
-		}
+	_, err := updateRecords(ctx, p.AuthAPIToken, zone, records, "DELETE")
+	if err != nil {
+		return nil, err
 	}
 
 	return records, nil
@@ -51,16 +44,10 @@ func (p *Provider) DeleteRecords(ctx context.Context, zone string, records []lib
 // SetRecords sets the records in the zone, either by updating existing records
 // or creating new ones. It returns the updated records.
 func (p *Provider) SetRecords(ctx context.Context, zone string, records []libdns.Record) ([]libdns.Record, error) {
-	var setRecords []libdns.Record
-
-	for _, record := range records {
-		setRecord, err := upsertRecord(ctx, p.AuthAPIToken, unFQDN(zone), record, "REPLACE")
-		if err != nil {
-			return setRecords, err
-		}
-		setRecords = append(setRecords, setRecord)
+	setRecords, err := upsertRecords(ctx, p.AuthAPIToken, zone, records, "REPLACE")
+	if err != nil {
+		return setRecords, err
 	}
-
 	return setRecords, nil
 }
 

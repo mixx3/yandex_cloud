@@ -26,6 +26,7 @@ type getAllRecordsResponse struct {
 type createRecordResponse struct {
 	ID          string `json:"id,omitempty"`
 	Description string `json:"description"`
+	Response 	upsertRecordsBody `json:"response"`
 	CreatedAt   string `json:"createdAt"`
 	CreatedBy   string `json:"createdBy"`
 	ModifiedAt  string `json:"modifiedAt"`
@@ -35,6 +36,7 @@ type createRecordResponse struct {
 type updateRecordResponse struct {
 	ID          string `json:"id,omitempty"`
 	Description string `json:"description"`
+	Response updateRecordsBody `json:"response"`
 	CreatedAt   string `json:"createdAt"`
 	CreatedBy   string `json:"createdBy"`
 	ModifiedAt  string `json:"modifiedAt"`
@@ -139,7 +141,7 @@ func getAllRecords(ctx context.Context, token string, zoneID string) ([]libdns.R
 	return records, nil
 }
 
-func upsertRecord(ctx context.Context, token string, zoneID string, r libdns.Record, method string) (libdns.Record, error) {
+func upsertRecords(ctx context.Context, token string, zoneID string, rs []libdns.Record, method string) ([]libdns.Record, error) {
 	// zoneID, err := getZoneID(ctx, token, zone)
 	// if err != nil {
 	// 	return libdns.Record{}, err
@@ -152,97 +154,124 @@ func upsertRecord(ctx context.Context, token string, zoneID string, r libdns.Rec
 	}
 	zoneName, err := getZoneName(ctx, token, zoneID)
 	if err != nil{
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
-	recordData := record{
+	for _, r := range rs{
+		recordData := record{
 		Type: r.Type,
 		Name: normalizeRecordName(r.Name, zoneName),
 		Data: []string{r.Value},
 		TTL:  fmt.Sprint(r.TTL.Seconds()),
+		}
+		if method == "DELETE" {
+			reqData.Replacements = append(reqData.Replacements, recordData)
+		}
+		if method == "REPLACE" {
+			reqData.Deletions = append(reqData.Deletions, recordData)
+		}
+		if method == "MERGE" {
+			reqData.Merges = append(reqData.Merges, recordData)
+		}
 	}
-
-	if method == "DELETE" {
-		reqData.Replacements = append(reqData.Replacements, recordData)
-	}
-	if method == "REPLACE" {
-		reqData.Deletions = append(reqData.Deletions, recordData)
-	}
-	if method == "MERGE" {
-		reqData.Merges = append(reqData.Merges, recordData)
-	}
-
 	reqBuffer, err := json.Marshal(reqData)
 	if err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://dns.api.cloud.yandex.net/dns/v1/zones/%s:upsertRecordSets", zoneID), bytes.NewBuffer(reqBuffer))
 	data, err := doRequest(token, req)
 	if err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
 
 	result := createRecordResponse{}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
-
-	return libdns.Record{
+	resultList := []record{}
+	if method == "DELETE" {
+		resultList = result.Response.Deletions
+	}
+	if method == "REPLACE" {
+		resultList = result.Response.Replacements
+	}
+	if method == "MERGE" {
+		resultList = result.Response.Merges
+	}
+	res := make([]libdns.Record, 0)
+	for _, r := range resultList{
+		intTtl, _ := strconv.Atoi(r.TTL)
+		res = append(res, libdns.Record{
 		ID:    result.ID,
 		Type:  r.Type,
 		Name:  r.Name,
-		Value: r.Value,
-		TTL:   r.TTL,
-	}, nil
+		Value: r.Data[0],
+		TTL:   time.Duration(intTtl) * time.Second,
+		})
+	}
+	return res, nil
 }
 
-func updateRecord(ctx context.Context, token string, zoneID string, r libdns.Record, method string) (libdns.Record, error) {
+func updateRecords(ctx context.Context, token string, zoneID string, rs []libdns.Record, method string) ([]libdns.Record, error) {
 	zoneName, err := getZoneName(ctx, token, zoneID)
 	if err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
 
 	reqData := updateRecordsBody{
 		Additions: []record{},
 		Deletions: []record{},
 	}
-	recordData := record{
-		Type: r.Type,
-		Name: normalizeRecordName(r.Name, zoneName),
-		Data: []string{r.Value},
-		TTL:  fmt.Sprint(r.TTL.Seconds()),
-	}
 
-	if method == "DELETE" {
-		reqData.Deletions = append(reqData.Deletions, recordData)
-	}
-	if method == "ADD" {
-		reqData.Additions = append(reqData.Additions, recordData)
+	for _, r := range rs{
+		recordData := record{
+			Type: r.Type,
+			Name: normalizeRecordName(r.Name, zoneName),
+			Data: []string{r.Value},
+			TTL:  fmt.Sprint(r.TTL.Seconds()),
+		}
+		if method == "DELETE" {
+			reqData.Deletions = append(reqData.Deletions, recordData)
+		}
+		if method == "ADD" {
+			reqData.Additions = append(reqData.Additions, recordData)
+		}
 	}
 
 	reqBuffer, err := json.Marshal(reqData)
 	if err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", fmt.Sprintf("https://dns.api.cloud.yandex.net/dns/v1/zones/%s:updateRecordSets", zoneID), bytes.NewBuffer(reqBuffer))
 	data, err := doRequest(token, req)
 	if err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
 
-	result := createRecordResponse{}
+	result := updateRecordResponse{}
 	if err := json.Unmarshal(data, &result); err != nil {
-		return libdns.Record{}, err
+		return []libdns.Record{}, err
 	}
-
-	return libdns.Record{
+	resultList := []record{}
+	if method == "DELETE" {
+		resultList = result.Response.Deletions
+	}
+	if method == "ADD" {
+		resultList = result.Response.Additions
+	}
+	res := make([]libdns.Record, 0)
+	for _, r := range resultList{
+		intTtl, _ := strconv.Atoi(r.TTL)
+		res = append(res, libdns.Record{
 		ID:    result.ID,
 		Type:  r.Type,
 		Name:  r.Name,
-		Value: r.Value,
-		TTL:   r.TTL,
-	}, nil
+		Value: r.Data[0],
+		TTL:   time.Duration(intTtl) * time.Second,
+		})
+	}
+	return res, nil
 }
 
 func normalizeRecordName(recordName string, zone string) string {
