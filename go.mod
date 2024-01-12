@@ -1,4 +1,4 @@
-module github.com/mixx3/yandex_cloud
+module github.com/profcomff/yandex_cloud
 
 go 1.21.5
 
